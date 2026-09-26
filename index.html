@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P2P Realtime Chat</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+    body { background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    .chat-container { width: 100%; max-width: 500px; height: 95vh; background: #fff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .chat-header { background: #0084ff; color: #fff; padding: 12px; text-align: center; }
+    
+    .connection-box { background: #e7f3ff; padding: 12px; font-size: 0.85rem; border-bottom: 1px solid #bde0fe; }
+    .id-display { font-weight: bold; color: #0084ff; background: #fff; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 4px; user-select: all; }
+    .connect-form { display: flex; gap: 6px; margin-top: 8px; }
+    .connect-form input { flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.85rem; }
+    .connect-form button { background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+
+    .messages-box { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #f9f9f9; }
+    .message { max-width: 75%; padding: 10px 14px; border-radius: 16px; font-size: 0.95rem; word-wrap: break-word; }
+    .message.other { align-self: flex-start; background: #e4e6eb; color: #000; }
+    .message.me { align-self: flex-end; background: #0084ff; color: #fff; }
+    .message.system { align-self: center; background: #ffeba8; color: #856404; font-size: 0.8rem; border-radius: 8px; }
+
+    .input-area { display: flex; padding: 12px; border-top: 1px solid #ddd; gap: 8px; }
+    .input-area input { flex: 1; padding: 10px 14px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
+    .input-area button { background: #0084ff; color: white; border: none; padding: 10px 18px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+  </style>
+
+  <!-- Thư viện PeerJS trực tiếp -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+  <div class="chat-container">
+    <div class="chat-header">
+      <h3 id="statusTitle">Trò Chuyện P2P Trực Tuyến</h3>
+    </div>
+
+    <div class="connection-box">
+      <div>Mã ID của bạn: <span class="id-display" id="myId">Đang tạo mã...</span></div>
+      <form class="connect-form" id="connectForm">
+        <input type="text" id="targetIdInput" placeholder="Nhập ID của người kia vào đây..." required />
+        <button type="submit">Kết nối</button>
+      </form>
+    </div>
+
+    <div class="messages-box" id="messagesBox"></div>
+
+    <form class="input-area" id="chatForm">
+      <input type="text" id="messageInput" placeholder="Nhập tin nhắn..." autocomplete="off" required disabled />
+      <button type="submit" id="sendBtn" disabled>Gửi</button>
+    </form>
+  </div>
+
+  <script>
+    let peer = new Peer();
+    let conn = null;
+
+    const myIdEl = document.getElementById("myId");
+    const messagesBox = document.getElementById("messagesBox");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const statusTitle = document.getElementById("statusTitle");
+
+    // Lấy ID kết nối của chính mình
+    peer.on('open', (id) => {
+      myIdEl.innerText = id;
+    });
+
+    // Khi người khác chủ động kết nối tới mình
+    peer.on('connection', (connection) => {
+      conn = connection;
+      setupConnection();
+    });
+
+    // Bấm nút Kết nối tới người khác
+    document.getElementById("connectForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const targetId = document.getElementById("targetIdInput").value.trim();
+      if (targetId) {
+        conn = peer.connect(targetId);
+        setupConnection();
+      }
+    });
+
+    // Thiết lập kênh chat khi kết nối thành công
+    function setupConnection() {
+      conn.on('open', () => {
+        statusTitle.innerText = "🟢 Đã kết nối thành công!";
+        messageInput.disabled = false;
+        sendBtn.disabled = false;
+        renderMessage("Hệ thống", "Hai máy đã kết nối trực tiếp với nhau!", "system");
+      });
+
+      // Nhận tin nhắn từ máy kia
+      conn.on('data', (data) => {
+        renderMessage("Người kia", data, "other");
+      });
+
+      conn.on('close', () => {
+        statusTitle.innerText = "🔴 Đã ngắt kết nối";
+        messageInput.disabled = true;
+        sendBtn.disabled = true;
+      });
+    }
+
+    // Gửi tin nhắn
+    document.getElementById("chatForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = messageInput.value.trim();
+      if (text && conn) {
+        conn.send(text);
+        renderMessage("Bạn", text, "me");
+        messageInput.value = "";
+      }
+    });
+
+    function renderMessage(sender, text, type) {
+      const msgDiv = document.createElement("div");
+      msgDiv.classList.add("message", type);
+      msgDiv.innerText = text;
+      messagesBox.appendChild(msgDiv);
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+    }
+  </script>
+</body>
+</html>
