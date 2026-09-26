@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-time Chat App</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 500px;
+      height: 90vh;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      background-color: #0084ff;
+      color: white;
+      padding: 16px;
+      text-align: center;
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+
+    .messages-box {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background-color: #f9f9f9;
+    }
+
+    .message {
+      max-width: 75%;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      word-wrap: break-word;
+      position: relative;
+    }
+
+    .message .sender-name {
+      font-size: 0.75rem;
+      font-weight: bold;
+      margin-bottom: 4px;
+      color: #65676b;
+    }
+
+    /* Tin nhắn người khác */
+    .message.other {
+      align-self: flex-start;
+      background-color: #e4e6eb;
+      color: #050505;
+      border-bottom-left-radius: 4px;
+    }
+
+    /* Tin nhắn của chính mình */
+    .message.me {
+      align-self: flex-end;
+      background-color: #0084ff;
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.me .sender-name {
+      display: none;
+    }
+
+    .input-area {
+      display: flex;
+      padding: 12px;
+      background: #ffffff;
+      border-top: 1px solid #e4e6eb;
+      gap: 8px;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      outline: none;
+      font-size: 0.95rem;
+    }
+
+    .input-area input:focus {
+      border-color: #0084ff;
+    }
+
+    .input-area button {
+      background-color: #0084ff;
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .input-area button:hover {
+      background-color: #006bce;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="chat-container">
+    <div class="chat-header">Trò Chuyện Trực Tuyến</div>
+    <div class="messages-box" id="messagesBox"></div>
+    <form class="input-area" id="chatForm">
+      <input type="text" id="messageInput" placeholder="Nhập tin nhắn..." autocomplete="off" required />
+      <button type="submit">Gửi</button>
+    </form>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // CẤU HÌNH FIREBASE DÙNG CHUNG MIỄN PHÍ DÀNH CHO DEMO
+    // (Bạn có thể thay đổi bằng cấu hình Firebase của riêng mình)
+    const firebaseConfig = {
+      databaseURL: "https://public-demo-chat-default-rtdb.firebaseio.com"
+    };
+
+    // Khởi tạo Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const messagesRef = ref(db, "public_messages");
+
+    // Lấy hoặc tạo Tên người dùng ngẫu nhiên
+    let username = localStorage.getItem("chat_username");
+    if (!username) {
+      username = "Người dùng " + Math.floor(1000 + Math.random() * 9000);
+      localStorage.setItem("chat_username", username);
+    }
+
+    const chatForm = document.getElementById("chatForm");
+    const messageInput = document.getElementById("messageInput");
+    const messagesBox = document.getElementById("messagesBox");
+
+    // Xử lý khi gửi tin nhắn
+    chatForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = messageInput.value.trim();
+      if (text) {
+        push(messagesRef, {
+          sender: username,
+          text: text,
+          timestamp: Date.now()
+        });
+        messageInput.value = "";
+      }
+    });
+
+    // Lắng nghe dữ liệu thời gian thực (Real-time) từ Firebase
+    onChildAdded(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+      displayMessage(data);
+    });
+
+    // Hiển thị tin nhắn lên giao diện
+    function displayMessage(data) {
+      const isMe = data.sender === username;
+      const msgDiv = document.createElement("div");
+      msgDiv.classList.add("message", isMe ? "me" : "other");
+
+      if (!isMe) {
+        const senderDiv = document.createElement("div");
+        senderDiv.classList.add("sender-name");
+        senderDiv.innerText = data.sender;
+        msgDiv.appendChild(senderDiv);
+      }
+
+      const textDiv = document.createElement("div");
+      textDiv.innerText = data.text;
+      msgDiv.appendChild(textDiv);
+
+      messagesBox.appendChild(msgDiv);
+      // Tự động cuộn xuống tin nhắn mới nhất
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+    }
+  </script>
+</body>
+</html>
